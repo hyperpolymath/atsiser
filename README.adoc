@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Atsiser
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: left
+:icons: font
+
+== What Is This?
+
+ATSiser wraps existing C codebases in **ATS linear types** for zero-cost
+memory safety — without rewriting the C code.
+
+ATS combines ML-level safety with C-level performance. Linear types track
+resource ownership at compile time with zero runtime overhead.
+
+== How It Works
+
+Describe your C interface in `atsiser.toml`. ATSiser:
+
+1. Generates ATS linear type wrappers for C functions
+2. Proves memory safety: no leaks, no use-after-free, no double-free
+3. Compiles ATS to C (zero overhead — same generated code)
+4. Creates a Zig FFI bridge for integration
+
+== Key Value
+
+* **Memory safety for C code** without rewrites
+* **Zero runtime overhead** — proofs erased at compile time
+* **Gradual adoption** — wrap critical functions first
+
+== Architecture
+
+Follows the hyperpolymath -iser pattern (same as https://github.com/hyperpolymath/chapeliser[Chapeliser]):
+
+* **Manifest** (`atsiser.toml`) — describe WHAT you want
+* **Idris2 ABI** (`src/abi/`) — formal proofs of interface correctness
+* **Zig FFI** (`ffi/zig/`) — C-ABI bridge to target language runtime
+* **Codegen** (`src/codegen/`) — generates target language wrapper code
+* **Rust CLI** — parses manifest, validates, generates, builds, runs
+
+User writes zero target language code. Atsiser generates everything.
+
+Part of the https://github.com/hyperpolymath/iseriser[-iser family] of acceleration frameworks.
+
+== Status
+
+**Pre-alpha.** Architecture defined, scaffolding in place, codegen pending.
+
+== License
+
+SPDX-License-Identifier: PMPL-1.0-or-later
