@@ -11,27 +11,35 @@
   (project-context
     (name "atsiser")
     (description "Wrap C codebases in ATS2 linear types for zero-cost memory safety")
-    (status "scaffold")
+    (status "phase-1-complete")
     (priority "—")
     (ecosystem "-iser family (https://github.com/hyperpolymath/iseriser)"))
 
   (current-position
-    (phase "scaffold-documented")
-    (completion-percentage 10)
-    (milestone "Architecture documented, ABI/FFI bespoke, all placeholders replaced"))
+    (phase "phase-1-complete")
+    (completion-percentage 45)
+    (milestone "Phase 1: scaffold, bespoke ABI/FFI, CLI, manifest parser, codegen stubs, RSR compliance, documentation — all complete"))
 
   (route-to-mvp
-    (step 1 "C source analysis — parse headers, identify allocation patterns, track ownership")
-    (step 2 "ATS2 wrapper generation — viewtype annotations, dataviewtype state machines")
-    (step 3 "Proof generation — praxi/prfun obligations for ownership and bounds")
-    (step 4 "Round-trip compilation — ATS2 → C with zero overhead verification")
-    (step 5 "Idris2 meta-proofs — prove generated ATS2 proofs are sound")
-    (step 6 "Ecosystem — BoJ cartridge, PanLL panels, CI/CD integration"))
+    (step 1 "DONE — Project scaffold from rsr-template-repo")
+    (step 2 "DONE — Bespoke Idris2 ABI type definitions")
+    (step 3 "DONE — Bespoke Zig FFI implementation stubs")
+    (step 4 "DONE — CLI with subcommands (init, validate, generate, build, run, info)")
+    (step 5 "DONE — Manifest parser (atsiser.toml)")
+    (step 6 "DONE — Codegen engine stubs")
+    (step 7 "DONE — RSR compliance (17 workflows, governance, contractiles)")
+    (step 8 "DONE — Bespoke documentation (README, ROADMAP, CONTRIBUTING, CHANGELOG)")
+    (step 9 "Implement core domain logic (source analysis, pattern detection)")
+    (step 10 "Implement codegen passes (target-language-specific output)")
+    (step 11 "Write Idris2 formal proofs for domain invariants")
+    (step 12 "End-to-end integration tests with real inputs")
+    (step 13 "BoJ cartridge and PanLL panel integration")
+    (step 14 "Performance benchmarks and optimisation"))
 
   (blockers-and-issues
-    (none "Project is in scaffold phase — no blockers yet"))
+    (none "Phase 1 complete — no blockers. Phase 2 requires domain logic implementation."))
 
   (critical-next-actions
-    (action "Implement C header parsing in src/core/")
-    (action "Implement allocation pattern detection (malloc/free pairing)")
-    (action "First working end-to-end example: simple C library → ATS2 wrapper")))
+    (action "Implement core domain logic in src/core/")
+    (action "Write first end-to-end example with real input")
+    (action "Begin Idris2 formal proofs for domain-specific invariants")))
