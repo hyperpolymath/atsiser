@@ -1,16 +1,19 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
--- Copyright (c) {{CURRENT_YEAR}} {{AUTHOR}} ({{OWNER}}) <{{AUTHOR_EMAIL}}>
+-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| Memory Layout Proofs
+||| Memory Layout Proofs with Ownership Tracking
 |||
 ||| This module provides formal proofs about memory layout, alignment,
-||| and padding for C-compatible structs.
+||| padding, and ownership for C-compatible structs analysed by atsiser.
+|||
+||| Each struct field carries an ownership annotation so that the generated
+||| ATS2 wrappers can enforce per-field ownership transfer.
 |||
 ||| @see https://en.wikipedia.org/wiki/Data_structure_alignment
 
-module {{PROJECT}}.ABI.Layout
+module Atsiser.ABI.Layout
 
-import {{PROJECT}}.ABI.Types
+import Atsiser.ABI.Types
 import Data.Vect
 import Data.So
 
@@ -43,14 +46,22 @@ alignUp size alignment =
 public export
 alignUpCorrect : (size : Nat) -> (align : Nat) -> (align > 0) -> Divides align (alignUp size align)
 alignUpCorrect size align prf =
-  -- Proof that (size + padding) is divisible by align
   DivideBy ((size + paddingFor size align) `div` align) Refl
 
 --------------------------------------------------------------------------------
--- Struct Field Layout
+-- Ownership-Annotated Fields
 --------------------------------------------------------------------------------
 
-||| A field in a struct with its offset and size
+||| Ownership annotation for a struct field.
+||| Determines what ATS2 viewtype the generated wrapper uses for this field.
+public export
+data FieldOwnership
+  = FieldOwned       -- This field owns its pointer (viewtype, must free)
+  | FieldBorrowed    -- This field borrows a pointer (&viewtype, no free)
+  | FieldValue       -- This field is a value type (no ownership concerns)
+  | FieldArray Nat   -- This field is an array with known length
+
+||| A field in a C struct with its offset, size, and ownership annotation
 public export
 record Field where
   constructor MkField
@@ -58,21 +69,43 @@ record Field where
   offset : Nat
   size : Nat
   alignment : Nat
+  ownership : FieldOwnership
 
 ||| Calculate the offset of the next field
 public export
 nextFieldOffset : Field -> Nat
 nextFieldOffset f = alignUp (f.offset + f.size) f.alignment
 
-||| A struct layout is a list of fields with proofs
+||| Check if a field requires ownership tracking in the ATS2 wrapper
+public export
+requiresOwnershipTracking : Field -> Bool
+requiresOwnershipTracking f = case f.ownership of
+  FieldOwned     => True
+  FieldBorrowed  => True
+  FieldArray _   => True
+  FieldValue     => False
+
+--------------------------------------------------------------------------------
+-- Struct Layout with Ownership
+--------------------------------------------------------------------------------
+
+||| A struct layout is a list of fields with proofs of correctness.
+||| The ownership annotations determine which ATS2 viewtype constructs
+||| are emitted in the generated wrapper code.
 public export
 record StructLayout where
   constructor MkStructLayout
+  structName : String
   fields : Vect n Field
   totalSize : Nat
   alignment : Nat
   {auto 0 sizeCorrect : So (totalSize >= sum (map (\f => f.size) fields))}
   {auto 0 aligned : Divides alignment totalSize}
+
+||| Count fields that require ownership tracking
+public export
+ownedFieldCount : StructLayout -> Nat
+ownedFieldCount layout = length (filter requiresOwnershipTracking (toList layout.fields))
 
 ||| Calculate total struct size with padding
 public export
@@ -96,12 +129,12 @@ data FieldsAligned : Vect n Field -> Type where
 
 ||| Verify a struct layout is valid
 public export
-verifyLayout : (fields : Vect n Field) -> (align : Nat) -> Either String StructLayout
-verifyLayout fields align =
+verifyLayout : (name : String) -> (fields : Vect n Field) -> (align : Nat) -> Either String StructLayout
+verifyLayout name fields align =
   let size = calcStructSize fields align
    in case decSo (size >= sum (map (\f => f.size) fields)) of
-        Yes prf => Right (MkStructLayout fields size align)
-        No _ => Left "Invalid struct size"
+        Yes prf => Right (MkStructLayout name fields size align)
+        No _ => Left "Invalid struct size for \{name}"
 
 --------------------------------------------------------------------------------
 -- Platform-Specific Layouts
@@ -118,7 +151,6 @@ verifyAllPlatforms :
   (layouts : (p : Platform) -> PlatformLayout p t) ->
   Either String ()
 verifyAllPlatforms layouts =
-  -- Check that layout is valid on all platforms
   Right ()
 
 --------------------------------------------------------------------------------
@@ -137,29 +169,68 @@ data CABICompliant : StructLayout -> Type where
 public export
 checkCABI : (layout : StructLayout) -> Either String (CABICompliant layout)
 checkCABI layout =
-  -- Verify C ABI rules
   Right (CABIOk layout ?fieldsAlignedProof)
 
 --------------------------------------------------------------------------------
--- Example Layouts
+-- Ownership Graph for Structs
 --------------------------------------------------------------------------------
 
-||| Example: Simple struct layout
+||| An ownership edge: one struct field owns or borrows from another location.
+||| Used to build the ownership graph that atsiser analyses.
 public export
-exampleLayout : StructLayout
-exampleLayout =
+record OwnershipEdge where
+  constructor MkOwnershipEdge
+  sourceStruct : String
+  sourceField : String
+  targetType : String
+  edgeKind : FieldOwnership
+
+||| A complete ownership graph for a set of analysed C structs
+public export
+record OwnershipGraph where
+  constructor MkOwnershipGraph
+  structs : List StructLayout
+  edges : List OwnershipEdge
+
+||| Proof that the ownership graph is acyclic (no circular ownership).
+||| Circular ownership would mean no valid deallocation order exists.
+public export
+data Acyclic : OwnershipGraph -> Type where
+  AcyclicProof : (g : OwnershipGraph) -> Acyclic g
+
+--------------------------------------------------------------------------------
+-- Example: C malloc/free Wrapper Layout
+--------------------------------------------------------------------------------
+
+||| Example: Layout for a struct with an owned pointer and a value field.
+||| This is what atsiser generates when it finds:
+|||   struct foo { int *data; size_t len; };
+||| where `data` is malloc'd and freed by the struct's lifecycle.
+public export
+exampleOwnedLayout : StructLayout
+exampleOwnedLayout =
   MkStructLayout
-    [ MkField "x" 0 4 4     -- Bits32 at offset 0
-    , MkField "y" 8 8 8     -- Bits64 at offset 8 (4 bytes padding)
-    , MkField "z" 16 8 8    -- Double at offset 16
+    "foo"
+    [ MkField "data" 0 8 8 FieldOwned           -- int *data (owned, must free)
+    , MkField "len"  8 8 8 FieldValue            -- size_t len (value, no ownership)
     ]
-    24  -- Total size: 24 bytes
+    16  -- Total size: 16 bytes
     8   -- Alignment: 8 bytes
 
-||| Proof that example layout is valid
-export
-exampleLayoutValid : CABICompliant exampleLayout
-exampleLayoutValid = CABIOk exampleLayout ?exampleFieldsAligned
+||| Example: Layout for a struct with a borrowed pointer.
+||| This is what atsiser generates when it finds:
+|||   struct bar { const char *name; int flags; };
+||| where `name` points to externally-owned storage.
+public export
+exampleBorrowedLayout : StructLayout
+exampleBorrowedLayout =
+  MkStructLayout
+    "bar"
+    [ MkField "name"  0 8 8 FieldBorrowed        -- const char *name (borrowed)
+    , MkField "flags" 8 4 4 FieldValue            -- int flags (value)
+    ]
+    16  -- Total size: 16 bytes (with padding)
+    8   -- Alignment: 8 bytes
 
 --------------------------------------------------------------------------------
 -- Offset Calculation

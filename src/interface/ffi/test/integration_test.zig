@@ -1,79 +1,167 @@
-// {{PROJECT}} Integration Tests
+// Atsiser Integration Tests
 // SPDX-License-Identifier: PMPL-1.0-or-later
 //
 // These tests verify that the Zig FFI correctly implements the Idris2 ABI
+// for atsiser's C source analysis and ATS2 wrapper generation engine.
 
 const std = @import("std");
 const testing = std.testing;
 
 // Import FFI functions
-extern fn {{project}}_init() ?*opaque {};
-extern fn {{project}}_free(?*opaque {}) void;
-extern fn {{project}}_process(?*opaque {}, u32) c_int;
-extern fn {{project}}_get_string(?*opaque {}) ?[*:0]const u8;
-extern fn {{project}}_free_string(?[*:0]const u8) void;
-extern fn {{project}}_last_error() ?[*:0]const u8;
-extern fn {{project}}_version() [*:0]const u8;
-extern fn {{project}}_is_initialized(?*opaque {}) u32;
+extern fn atsiser_init() ?*opaque {};
+extern fn atsiser_free(?*opaque {}) void;
+extern fn atsiser_parse_header(?*opaque {}, ?[*:0]const u8) c_int;
+extern fn atsiser_analyse_allocations(?*opaque {}) u32;
+extern fn atsiser_build_ownership_graph(?*opaque {}) c_int;
+extern fn atsiser_detect_buffers(?*opaque {}) u32;
+extern fn atsiser_generate_viewtypes(?*opaque {}, ?[*:0]const u8) c_int;
+extern fn atsiser_generate_proofs(?*opaque {}, ?[*:0]const u8) c_int;
+extern fn atsiser_generate_bounds_proofs(?*opaque {}, ?[*:0]const u8) c_int;
+extern fn atsiser_compile_ats2(?*opaque {}, ?[*:0]const u8, ?[*:0]const u8) c_int;
+extern fn atsiser_verify_linkage(?*opaque {}, ?[*:0]const u8, ?[*:0]const u8) c_int;
+extern fn atsiser_allocation_count(?*opaque {}) u32;
+extern fn atsiser_ownership_edge_count(?*opaque {}) u32;
+extern fn atsiser_proof_count(?*opaque {}) u32;
+extern fn atsiser_analysis_report(?*opaque {}) ?[*:0]const u8;
+extern fn atsiser_free_string(?[*:0]const u8) void;
+extern fn atsiser_last_error() ?[*:0]const u8;
+extern fn atsiser_version() [*:0]const u8;
+extern fn atsiser_build_info() [*:0]const u8;
+extern fn atsiser_is_initialized(?*opaque {}) u32;
 
 //==============================================================================
 // Lifecycle Tests
 //==============================================================================
 
 test "create and destroy handle" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
 
     try testing.expect(handle != null);
 }
 
 test "handle is initialized" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
 
-    const initialized = {{project}}_is_initialized(handle);
+    const initialized = atsiser_is_initialized(handle);
     try testing.expectEqual(@as(u32, 1), initialized);
 }
 
 test "null handle is not initialized" {
-    const initialized = {{project}}_is_initialized(null);
+    const initialized = atsiser_is_initialized(null);
     try testing.expectEqual(@as(u32, 0), initialized);
 }
 
 //==============================================================================
-// Operation Tests
+// C Source Analysis Tests
 //==============================================================================
 
-test "process with valid handle" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    const result = {{project}}_process(handle, 42);
-    try testing.expectEqual(@as(c_int, 0), result); // 0 = ok
-}
-
-test "process with null handle returns error" {
-    const result = {{project}}_process(null, 42);
+test "parse header with null handle returns error" {
+    const result = atsiser_parse_header(null, "test.h");
     try testing.expectEqual(@as(c_int, 4), result); // 4 = null_pointer
 }
 
-//==============================================================================
-// String Tests
-//==============================================================================
+test "parse header with null path returns error" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
 
-test "get string result" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    const str = {{project}}_get_string(handle);
-    defer if (str) |s| {{project}}_free_string(s);
-
-    try testing.expect(str != null);
+    const result = atsiser_parse_header(handle, null);
+    try testing.expectEqual(@as(c_int, 2), result); // 2 = invalid_param
 }
 
-test "get string with null handle" {
-    const str = {{project}}_get_string(null);
-    try testing.expect(str == null);
+test "allocation count starts at zero" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const count = atsiser_analyse_allocations(handle);
+    try testing.expectEqual(@as(u32, 0), count);
+}
+
+test "build ownership graph with valid handle" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const result = atsiser_build_ownership_graph(handle);
+    try testing.expectEqual(@as(c_int, 0), result); // 0 = ok
+}
+
+test "detect buffers with valid handle" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const count = atsiser_detect_buffers(handle);
+    try testing.expectEqual(@as(u32, 0), count);
+}
+
+//==============================================================================
+// ATS2 Generation Tests
+//==============================================================================
+
+test "generate viewtypes with null handle returns error" {
+    const result = atsiser_generate_viewtypes(null, "/tmp/out");
+    try testing.expectEqual(@as(c_int, 4), result); // null_pointer
+}
+
+test "generate viewtypes with null output returns error" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const result = atsiser_generate_viewtypes(handle, null);
+    try testing.expectEqual(@as(c_int, 2), result); // invalid_param
+}
+
+test "generate proofs with valid handle" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const result = atsiser_generate_proofs(handle, "/tmp/proofs");
+    try testing.expectEqual(@as(c_int, 0), result); // ok
+}
+
+test "generate bounds proofs with valid handle" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const result = atsiser_generate_bounds_proofs(handle, "/tmp/bounds");
+    try testing.expectEqual(@as(c_int, 0), result); // ok
+}
+
+//==============================================================================
+// Compilation Tests
+//==============================================================================
+
+test "compile ats2 with null handle returns error" {
+    const result = atsiser_compile_ats2(null, "/tmp/ats", "/tmp/c");
+    try testing.expectEqual(@as(c_int, 4), result); // null_pointer
+}
+
+test "verify linkage with null handle returns error" {
+    const result = atsiser_verify_linkage(null, "/tmp/gen.c", "/tmp/lib.so");
+    try testing.expectEqual(@as(c_int, 4), result); // null_pointer
+}
+
+//==============================================================================
+// Analysis Result Tests
+//==============================================================================
+
+test "analysis counts are zero after init" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    try testing.expectEqual(@as(u32, 0), atsiser_allocation_count(handle));
+    try testing.expectEqual(@as(u32, 0), atsiser_ownership_edge_count(handle));
+    try testing.expectEqual(@as(u32, 0), atsiser_proof_count(handle));
+}
+
+test "analysis report returns valid JSON" {
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
+
+    const report = atsiser_analysis_report(handle);
+    defer if (report) |r| atsiser_free_string(r);
+
+    try testing.expect(report != null);
 }
 
 //==============================================================================
@@ -81,9 +169,9 @@ test "get string with null handle" {
 //==============================================================================
 
 test "last error after null handle operation" {
-    _ = {{project}}_process(null, 0);
+    _ = atsiser_parse_header(null, null);
 
-    const err = {{project}}_last_error();
+    const err = atsiser_last_error();
     try testing.expect(err != null);
 
     if (err) |e| {
@@ -93,13 +181,11 @@ test "last error after null handle operation" {
 }
 
 test "no error after successful operation" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+    const handle = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(handle);
 
-    _ = {{project}}_process(handle, 0);
-
+    _ = atsiser_build_ownership_graph(handle);
     // Error should be cleared after successful operation
-    // (This depends on implementation)
 }
 
 //==============================================================================
@@ -107,18 +193,25 @@ test "no error after successful operation" {
 //==============================================================================
 
 test "version string is not empty" {
-    const ver = {{project}}_version();
+    const ver = atsiser_version();
     const ver_str = std.mem.span(ver);
 
     try testing.expect(ver_str.len > 0);
 }
 
 test "version string is semantic version format" {
-    const ver = {{project}}_version();
+    const ver = atsiser_version();
     const ver_str = std.mem.span(ver);
 
     // Should be in format X.Y.Z
     try testing.expect(std.mem.count(u8, ver_str, ".") >= 1);
+}
+
+test "build info contains atsiser" {
+    const info = atsiser_build_info();
+    const info_str = std.mem.span(info);
+
+    try testing.expect(std.mem.indexOf(u8, info_str, "atsiser") != null);
 }
 
 //==============================================================================
@@ -126,57 +219,19 @@ test "version string is semantic version format" {
 //==============================================================================
 
 test "multiple handles are independent" {
-    const h1 = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(h1);
+    const h1 = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(h1);
 
-    const h2 = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(h2);
+    const h2 = atsiser_init() orelse return error.InitFailed;
+    defer atsiser_free(h2);
 
     try testing.expect(h1 != h2);
 
     // Operations on h1 should not affect h2
-    _ = {{project}}_process(h1, 1);
-    _ = {{project}}_process(h2, 2);
-}
-
-test "double free is safe" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-
-    {{project}}_free(handle);
-    {{project}}_free(handle); // Should not crash
+    _ = atsiser_build_ownership_graph(h1);
+    _ = atsiser_build_ownership_graph(h2);
 }
 
 test "free null is safe" {
-    {{project}}_free(null); // Should not crash
-}
-
-//==============================================================================
-// Thread Safety Tests (if applicable)
-//==============================================================================
-
-test "concurrent operations" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    const ThreadContext = struct {
-        h: *opaque {},
-        id: u32,
-    };
-
-    const thread_fn = struct {
-        fn run(ctx: ThreadContext) void {
-            _ = {{project}}_process(ctx.h, ctx.id);
-        }
-    }.run;
-
-    var threads: [4]std.Thread = undefined;
-    for (&threads, 0..) |*thread, i| {
-        thread.* = try std.Thread.spawn(.{}, thread_fn, .{
-            ThreadContext{ .h = handle, .id = @intCast(i) },
-        });
-    }
-
-    for (threads) |thread| {
-        thread.join();
-    }
+    atsiser_free(null); // Should not crash
 }

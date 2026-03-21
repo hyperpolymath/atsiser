@@ -1,13 +1,19 @@
-# ⚠️ STOP - CRITICAL READING REQUIRED
+# STOP - CRITICAL READING REQUIRED
 
 **THIS FILE MUST BE READ FIRST BY ALL AI AGENTS**
 
 ## WHAT IS THIS?
 
-This is the AI manifest for **[YOUR-REPO-NAME]**. It declares:
+This is the AI manifest for **atsiser**. It declares:
 - Canonical file locations (where things MUST be, and nowhere else)
 - Critical invariants (rules that must NEVER be violated)
 - Repository structure and organization
+
+**atsiser** wraps existing C codebases in ATS2 linear types for zero-cost
+memory safety. It analyses C source code, identifies memory-critical patterns
+(malloc/free pairs, buffer accesses, pointer arithmetic), generates ATS2
+wrappers with viewtype/dataviewtype annotations, and compiles them back to C
+with all proofs erased — zero runtime overhead.
 
 ## CANONICAL LOCATIONS (UNIVERSAL RULE)
 
@@ -55,7 +61,7 @@ Policy enforcement contracts (k9, dust, lust, must, trust).
 ### AI Configuration & Guides: `.machine_readable/ai/` ONLY
 
 - `AI.a2ml` - Language-specific or LLM-specific patterns
-- `PLACEHOLDERS.md` - Bootstrap guide
+- `PLACEHOLDERS.adoc` - Bootstrap guide
 
 ### Community & Forge Metadata: `.github/` ONLY
 
@@ -80,41 +86,47 @@ Policy enforcement contracts (k9, dust, lust, must, trust).
 6. **Container images** - MUST use Chainguard base (`cgr.dev/chainguard/wolfi-base:latest` or `cgr.dev/chainguard/static:latest`)
 7. **Container runtime** - Podman, never Docker. Files are `Containerfile`, never `Dockerfile`
 8. **Container orchestration** - `selur-compose`, never `docker-compose`
+9. **ATS2 safety** - Generated ATS2 code must never use `$UNSAFE` casts or bypass linear type discipline
 
 ## REPOSITORY STRUCTURE
 
 This repo follows the **Dual-Track** architecture:
 
 ```
-[YOUR-REPO-NAME]/
+atsiser/
 ├── 0-AI-MANIFEST.a2ml         # THIS FILE (start here)
-├── README.adoc                 # High-level orientation (Rich Human)
-├── ROADMAP.adoc                # Future direction
+├── README.adoc                 # What atsiser does, architecture, CLI commands
+├── ROADMAP.adoc                # 7-phase roadmap (C analysis → ATS2 generation → proofs)
+├── TOPOLOGY.md                 # Module map and data flow diagram
 ├── CONTRIBUTING.adoc           # Human contribution guide
 ├── GOVERNANCE.adoc             # Decision-making model
 ├── Justfile                    # Task runner
-├── Containerfile               # OCI build
-├── LICENSE                     # Primary license
+├── Containerfile               # OCI build (Chainguard base)
+├── Cargo.toml                  # Rust CLI dependencies
+├── LICENSE                     # PMPL-1.0-or-later
 ├── src/                        # Source code
+│   ├── main.rs                 # CLI entry point
+│   ├── lib.rs                  # Library API
+│   ├── manifest/               # atsiser.toml parser
+│   ├── codegen/                # ATS2 wrapper generation
+│   ├── core/                   # C source analysis engine
 │   └── interface/              # Verified Interface Seams
-│       ├── abi/                # Idris2 ABI (The Spec)
-│       ├── ffi/                # Zig FFI (The Bridge)
-│       └── generated/          # C Headers (The Result)
+│       ├── abi/                # Idris2 ABI (proves memory safety properties)
+│       │   ├── Types.idr       # LinearPtr, Viewtype, OwnershipState, BufferBounds
+│       │   ├── Layout.idr      # Struct layout with per-field ownership
+│       │   └── Foreign.idr     # C analysis + ATS2 compilation FFI
+│       ├── ffi/                # Zig FFI (C-ABI bridge)
+│       └── generated/          # Auto-generated C headers
 ├── container/                  # Stapeln container ecosystem
-├── docs/                       # Technical depths
-│   ├── attribution/            # Citations, owners, maintainers (adoc)
-│   ├── architecture/           # Topology, diagrams
-│   ├── theory/                 # Domain theory
-│   └── practice/               # Manuals
-├── docs/legal/                  # Legal exhibits and full texts
+├── docs/                       # Technical documentation
 └── .machine_readable/          # ALL machine-readable metadata
 ```
 
 ## SESSION STARTUP CHECKLIST
 
-✅ Read THIS file (0-AI-MANIFEST.a2ml) first
-✅ Understand canonical location: `.machine_readable/`
-✅ State understanding of canonical locations
+Read THIS file (0-AI-MANIFEST.a2ml) first
+Understand canonical location: `.machine_readable/`
+State understanding of canonical locations
 
 ## ATTESTATION PROOF
 

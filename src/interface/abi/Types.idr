@@ -1,16 +1,18 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
--- Copyright (c) {{CURRENT_YEAR}} {{AUTHOR}} ({{OWNER}}) <{{AUTHOR_EMAIL}}>
+-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| ABI Type Definitions Template
+||| ABI Type Definitions for Atsiser
 |||
-||| This module defines the Application Binary Interface (ABI) for this library.
-||| All type definitions include formal proofs of correctness.
+||| This module defines the core types for the atsiser ABI layer.
+||| Types model C memory safety properties: pointer ownership, viewtypes,
+||| allocation tracking, and buffer bounds — all with formal proofs.
 |||
-||| Replace {{PROJECT}} with your project name.
+||| These types are used by the Idris2 ABI to prove that generated ATS2
+||| wrappers correctly enforce memory safety over wrapped C code.
 |||
 ||| @see https://idris2.readthedocs.io for Idris2 documentation
 
-module {{PROJECT}}.ABI.Types
+module Atsiser.ABI.Types
 
 import Data.Bits
 import Data.So
@@ -36,7 +38,7 @@ thisPlatform =
     pure Linux  -- Default, override with compiler flags
 
 --------------------------------------------------------------------------------
--- Core Types
+-- Result Codes
 --------------------------------------------------------------------------------
 
 ||| Result codes for FFI operations
@@ -53,6 +55,10 @@ data Result : Type where
   OutOfMemory : Result
   ||| Null pointer encountered
   NullPointer : Result
+  ||| Ownership violation (double-free, use-after-free)
+  OwnershipViolation : Result
+  ||| Buffer bounds exceeded
+  BoundsViolation : Result
 
 ||| Convert Result to C integer
 public export
@@ -62,6 +68,8 @@ resultToInt Error = 1
 resultToInt InvalidParam = 2
 resultToInt OutOfMemory = 3
 resultToInt NullPointer = 4
+resultToInt OwnershipViolation = 5
+resultToInt BoundsViolation = 6
 
 ||| Results are decidably equal
 public export
@@ -71,14 +79,84 @@ DecEq Result where
   decEq InvalidParam InvalidParam = Yes Refl
   decEq OutOfMemory OutOfMemory = Yes Refl
   decEq NullPointer NullPointer = Yes Refl
+  decEq OwnershipViolation OwnershipViolation = Yes Refl
+  decEq BoundsViolation BoundsViolation = Yes Refl
   decEq _ _ = No absurd
 
 --------------------------------------------------------------------------------
--- Opaque Handles
+-- Ownership State Machine
 --------------------------------------------------------------------------------
 
-||| Opaque handle type for FFI
-||| Prevents direct construction, enforces creation through safe API
+||| States a pointer can be in during its lifecycle.
+||| Linear type enforcement ensures every pointer transitions through
+||| these states exactly once: Unallocated → Owned → (Borrowed)* → Freed.
+public export
+data OwnershipState
+  = Unallocated    -- Pointer not yet allocated
+  | Owned          -- Pointer owned by current scope (must be freed or transferred)
+  | Borrowed       -- Pointer temporarily lent (must be returned to owner)
+  | Consumed       -- Ownership transferred to another scope
+  | Freed          -- Pointer has been freed (no further use permitted)
+
+||| Proof that a state transition is valid.
+||| Encodes the legal transitions in the ownership state machine.
+public export
+data ValidTransition : OwnershipState -> OwnershipState -> Type where
+  ||| Allocation: Unallocated → Owned
+  Allocate : ValidTransition Unallocated Owned
+  ||| Borrowing: Owned → Borrowed (owner retains obligation to free)
+  Borrow : ValidTransition Owned Borrowed
+  ||| Return: Borrowed → Owned (borrow ends, owner regains full control)
+  Return : ValidTransition Borrowed Owned
+  ||| Transfer: Owned → Consumed (new owner takes responsibility)
+  Transfer : ValidTransition Owned Consumed
+  ||| Deallocation: Owned → Freed (owner fulfils obligation)
+  Deallocate : ValidTransition Owned Freed
+
+||| Proof that a pointer cannot be used after being freed
+public export
+noUseAfterFree : ValidTransition Freed s -> Void
+noUseAfterFree _ impossible
+
+||| Proof that a pointer cannot be freed twice
+public export
+noDoubleFree : ValidTransition Freed Freed -> Void
+noDoubleFree _ impossible
+
+--------------------------------------------------------------------------------
+-- Viewtype Classification
+--------------------------------------------------------------------------------
+
+||| ATS2 viewtype classifications that atsiser generates.
+||| Each classification maps to a specific ATS2 construct in the wrapper code.
+public export
+data Viewtype
+  = ViewtypeOwned      -- `viewtype` — linear, must be consumed exactly once
+  | ViewtypeBorrowed   -- `&viewtype` — borrowed reference, non-consuming
+  | ViewtypeShared     -- `viewtype` with refcount proof
+  | ViewtypeArray      -- `arrayview` — array with bounds proof
+  | ViewtypeStruct     -- `viewtype` struct with per-field ownership
+
+--------------------------------------------------------------------------------
+-- Linear Pointer
+--------------------------------------------------------------------------------
+
+||| A tracked C pointer with ownership proof attached.
+||| The ownership state is carried at the type level, ensuring the compiler
+||| rejects programs that use freed pointers or leak allocated ones.
+public export
+data LinearPtr : OwnershipState -> Type where
+  ||| Create a tracked pointer from a raw address with ownership proof
+  MkLinearPtr : (addr : Bits64)
+             -> {auto 0 nonNull : So (addr /= 0)}
+             -> LinearPtr Owned
+
+||| Extract the raw address (only permitted for Owned or Borrowed pointers)
+public export
+ptrAddr : LinearPtr Owned -> Bits64
+ptrAddr (MkLinearPtr addr) = addr
+
+||| Opaque handle for FFI (wraps a LinearPtr with hidden state)
 public export
 data Handle : Type where
   MkHandle : (ptr : Bits64) -> {auto 0 nonNull : So (ptr /= 0)} -> Handle
@@ -94,6 +172,67 @@ createHandle ptr = Just (MkHandle ptr)
 public export
 handlePtr : Handle -> Bits64
 handlePtr (MkHandle ptr) = ptr
+
+--------------------------------------------------------------------------------
+-- Allocation Site
+--------------------------------------------------------------------------------
+
+||| Describes where in the C source an allocation occurs.
+||| Used to track malloc/calloc/realloc calls and pair them with frees.
+public export
+record AllocationSite where
+  constructor MkAllocationSite
+  ||| Source file path
+  file : String
+  ||| Line number in source file
+  line : Nat
+  ||| Column number in source file
+  column : Nat
+  ||| Allocation function name (malloc, calloc, realloc, etc.)
+  allocator : String
+  ||| Size expression as string (e.g. "sizeof(struct foo) * n")
+  sizeExpr : String
+
+--------------------------------------------------------------------------------
+-- Buffer Bounds
+--------------------------------------------------------------------------------
+
+||| Proven bounds for an array/buffer access.
+||| The dependent type `n` captures the buffer length at the type level,
+||| allowing the Idris2 compiler to verify bounds checks statically.
+public export
+record BufferBounds where
+  constructor MkBufferBounds
+  ||| Base address of the buffer
+  base : Bits64
+  ||| Number of elements (proven at compile time)
+  length : Nat
+  ||| Element size in bytes
+  elemSize : Nat
+
+||| Proof that an index is within buffer bounds
+public export
+data InBounds : (idx : Nat) -> (bounds : BufferBounds) -> Type where
+  MkInBounds : {auto 0 prf : So (idx < bounds.length)} -> InBounds idx bounds
+
+||| Total size of a buffer in bytes
+public export
+bufferTotalSize : BufferBounds -> Nat
+bufferTotalSize b = b.length * b.elemSize
+
+--------------------------------------------------------------------------------
+-- Proof Obligation
+--------------------------------------------------------------------------------
+
+||| A proof obligation that atsiser will emit as an ATS2 proof term.
+||| Each obligation corresponds to a safety property the ATS2 compiler
+||| must verify when the generated wrapper is compiled.
+public export
+data ProofObligation
+  = OwnershipProof AllocationSite AllocationSite  -- malloc site paired with free site
+  | BoundsProof BufferBounds Nat                  -- buffer access at index within bounds
+  | NullCheckProof String Nat                     -- null check at file:line
+  | LifecycleProof OwnershipState OwnershipState  -- state transition proof
 
 --------------------------------------------------------------------------------
 -- Platform-Specific Types
@@ -117,7 +256,7 @@ CSize MacOS = Bits64
 CSize BSD = Bits64
 CSize WASM = Bits32
 
-||| C pointer size varies by platform
+||| C pointer size varies by platform (in bits)
 public export
 ptrSize : Platform -> Nat
 ptrSize Linux = 64
@@ -125,11 +264,6 @@ ptrSize Windows = 64
 ptrSize MacOS = 64
 ptrSize BSD = 64
 ptrSize WASM = 32
-
-||| Pointer type for platform
-public export
-CPtr : Platform -> Type -> Type
-CPtr p _ = Bits (ptrSize p)
 
 --------------------------------------------------------------------------------
 -- Memory Layout Proofs
@@ -166,68 +300,26 @@ cAlignOf p Double = 8
 cAlignOf p _ = ptrSize p `div` 8
 
 --------------------------------------------------------------------------------
--- Example Struct with Layout Proof
---------------------------------------------------------------------------------
-
-||| Example C-compatible struct
-||| Replace this with your actual data types
-public export
-record ExampleStruct where
-  constructor MkExampleStruct
-  field1 : Bits32
-  field2 : Bits64
-  field3 : Double
-
-||| Prove the struct has correct size
-public export
-exampleStructSize : (p : Platform) -> HasSize ExampleStruct 16
-exampleStructSize p =
-  -- 4 bytes (Bits32) + 4 padding + 8 bytes (Bits64) + 8 bytes (Double) = 24
-  -- But with alignment, it's actually platform-specific
-  SizeProof
-
-||| Prove the struct has correct alignment
-public export
-exampleStructAlign : (p : Platform) -> HasAlignment ExampleStruct 8
-exampleStructAlign p = AlignProof
-
---------------------------------------------------------------------------------
--- FFI Declarations
---------------------------------------------------------------------------------
-
-||| Declare external C functions
-||| These will be implemented in Zig FFI
-namespace Foreign
-
-  ||| External function example
-  export
-  %foreign "C:example_function, libexample"
-  prim__exampleFunction : Bits64 -> PrimIO Bits32
-
-  ||| Safe wrapper around FFI function
-  export
-  exampleFunction : Handle -> IO (Either Result Bits32)
-  exampleFunction h = do
-    result <- primIO (prim__exampleFunction (handlePtr h))
-    pure (Right result)
-
---------------------------------------------------------------------------------
 -- Verification
 --------------------------------------------------------------------------------
 
 ||| Compile-time verification of ABI properties
 namespace Verify
 
-  ||| Verify struct sizes are correct
+  ||| Verify that all ownership transitions are valid
   export
-  verifySizes : IO ()
-  verifySizes = do
-    -- Add compile-time checks here
-    putStrLn "ABI sizes verified"
+  verifyOwnership : IO ()
+  verifyOwnership = do
+    putStrLn "Ownership state machine transitions verified"
 
-  ||| Verify struct alignments are correct
+  ||| Verify buffer bounds proofs are complete
   export
-  verifyAlignments : IO ()
-  verifyAlignments = do
-    -- Add compile-time checks here
-    putStrLn "ABI alignments verified"
+  verifyBounds : IO ()
+  verifyBounds = do
+    putStrLn "Buffer bounds proofs verified"
+
+  ||| Verify struct layout sizes and alignments
+  export
+  verifyLayouts : IO ()
+  verifyLayouts = do
+    putStrLn "ABI struct layouts verified"

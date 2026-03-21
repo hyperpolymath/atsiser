@@ -5,7 +5,7 @@
 
 [metadata]
 version = "1.0.0"
-last-updated = "{{CURRENT_DATE}}"
+last-updated = "2026-03-21"
 
 [anchor]
 schema = "hyperpolymath.anchor/1"
@@ -19,18 +19,19 @@ purpose = [
 ]
 
 [identity]
-project = "{{PROJECT_NAME}}"
-kind = "{{PROJECT_KIND}}"                # language | library | service | tool
-one-sentence = "{{PROJECT_PURPOSE}}"
-domain = "{{PROJECT_DOMAIN}}"
+project = "atsiser"
+kind = "tool"
+one-sentence = "Wrap C codebases in ATS2 linear types for zero-cost memory safety"
+domain = "memory-safety, linear-types, C-interop, formal-verification"
 
 [semantic-authority]
 policy = "canonical"
 
 owns = [
-  "Project semantics and specification",
-  "Invariant definitions and contractiles",
-  "Reference implementation behavior",
+  "C source analysis and allocation pattern detection",
+  "ATS2 viewtype/dataviewtype wrapper generation",
+  "Ownership graph construction and proof obligation emission",
+  "Round-trip ATS2-to-C compilation with zero overhead verification",
 ]
 
 [implementation-policy]
