@@ -124,16 +124,12 @@ pub fn build(manifest: &Manifest, release: bool) -> Result<()> {
 pub fn run(manifest: &Manifest, args: &[String]) -> Result<()> {
     let binary = format!(
         "{}/{}_safe",
-        manifest.project.output_dir,
-        manifest.project.name
+        manifest.project.output_dir, manifest.project.name
     );
     println!("Running atsiser workload: {} {:?}", binary, args);
 
     if !Path::new(&binary).exists() {
-        anyhow::bail!(
-            "Binary '{}' not found. Run 'atsiser build' first.",
-            binary
-        );
+        anyhow::bail!("Binary '{}' not found. Run 'atsiser build' first.", binary);
     }
 
     compiler::execute_run(&binary, args)?;

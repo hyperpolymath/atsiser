@@ -121,8 +121,8 @@ pub fn parse_c_source(source: &str) -> Result<Vec<CFunctionSignature>> {
         let likely_alloc = return_type.contains('*');
 
         // Heuristic: void return + takes pointer param -> likely deallocator
-        let likely_free = return_type.trim() == "void"
-            && params.iter().any(|p| p.is_pointer && !p.is_const);
+        let likely_free =
+            return_type.trim() == "void" && params.iter().any(|p| p.is_pointer && !p.is_const);
 
         signatures.push(CFunctionSignature {
             name,
@@ -154,7 +154,10 @@ fn parse_params(params_str: &str) -> Vec<CParam> {
 
         if let Some(cap) = PARAM_RE.captures(part) {
             let c_type = cap[1].trim().to_string();
-            let name = cap.get(2).map(|m| m.as_str().to_string()).unwrap_or_default();
+            let name = cap
+                .get(2)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
             let is_pointer = c_type.contains('*');
             let is_const = c_type.starts_with("const");
 
@@ -241,7 +244,11 @@ pub fn detect_ownership_pattern(sig: &CFunctionSignature) -> Option<&'static str
 
     // If all pointer params are const -> borrow
     if sig.params.iter().any(|p| p.is_pointer)
-        && sig.params.iter().filter(|p| p.is_pointer).all(|p| p.is_const)
+        && sig
+            .params
+            .iter()
+            .filter(|p| p.is_pointer)
+            .all(|p| p.is_const)
     {
         return Some("borrow");
     }

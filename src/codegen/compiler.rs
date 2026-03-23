@@ -74,7 +74,11 @@ impl fmt::Display for CompileCommand {
 /// # Returns
 ///
 /// A CompileCommand ready for execution or display.
-pub fn build_command(manifest: &Manifest, dats_file: &str, release: bool) -> Result<CompileCommand> {
+pub fn build_command(
+    manifest: &Manifest,
+    dats_file: &str,
+    release: bool,
+) -> Result<CompileCommand> {
     let ats2 = &manifest.ats2;
 
     let mut env = Vec::new();
@@ -138,9 +142,7 @@ pub fn typecheck_command(manifest: &Manifest, dats_file: &str) -> Result<Compile
         env.push(("PATSHOME".to_string(), patshome.clone()));
     }
 
-    let mut args = vec![
-        "--typecheck".to_string(),
-    ];
+    let mut args = vec!["--typecheck".to_string()];
 
     // ATS2-specific flags
     for flag in &ats2.flags {
@@ -273,7 +275,10 @@ mod tests {
 
         assert_eq!(cmd.program, "patscc");
         assert!(cmd.args.contains(&"-DATS_MEMALLOC_LIBC".to_string()));
-        assert!(cmd.args.contains(&"generated/ats/test_safe.dats".to_string()));
+        assert!(
+            cmd.args
+                .contains(&"generated/ats/test_safe.dats".to_string())
+        );
         assert!(cmd.env.iter().any(|(k, _)| k == "PATSHOME"));
     }
 

@@ -217,7 +217,10 @@ impl MemorySafetyProof {
     pub fn to_ats2_proof(&self) -> String {
         match self {
             MemorySafetyProof::AllocProof { viewtype } => {
-                format!("prval (pf_{} | p_{}) = alloc_{}", viewtype, viewtype, viewtype)
+                format!(
+                    "prval (pf_{} | p_{}) = alloc_{}",
+                    viewtype, viewtype, viewtype
+                )
             }
             MemorySafetyProof::FreeProof { ptr_id } => {
                 format!("prval () = free_{}(pf_{}, p_{})", ptr_id, ptr_id, ptr_id)
@@ -233,16 +236,10 @@ impl MemorySafetyProof {
                 buffer_id,
                 index_expr,
             } => {
-                format!(
-                    "prval () = lemma_bounds(pf_{}, {})",
-                    buffer_id, index_expr
-                )
+                format!("prval () = lemma_bounds(pf_{}, {})", buffer_id, index_expr)
             }
             MemorySafetyProof::NullCheckProof { ptr_id } => {
-                format!(
-                    "prval () = opt_unsome(pf_{})",
-                    ptr_id
-                )
+                format!("prval () = opt_unsome(pf_{})", ptr_id)
             }
         }
     }
@@ -340,10 +337,7 @@ impl ATSModule {
         }
 
         // Staload for C interop
-        out.push_str(&format!(
-            "staload \"{}_c.sats\"\n\n",
-            self.name
-        ));
+        out.push_str(&format!("staload \"{}_c.sats\"\n\n", self.name));
 
         // Viewtype definitions
         for vt in &self.viewtypes {
@@ -381,10 +375,7 @@ fn generate_ats_function(func: &ATSFunction) -> String {
         })
         .collect();
 
-    let ret = func
-        .return_type
-        .as_deref()
-        .unwrap_or("void");
+    let ret = func.return_type.as_deref().unwrap_or("void");
 
     out.push_str(&format!(
         "implement\nfun {}({}): {} = let\n",

@@ -208,8 +208,7 @@ pub struct LegacyOptions {
 pub fn load_manifest(path: &str) -> Result<Manifest> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read manifest: {}", path))?;
-    toml::from_str(&content)
-        .with_context(|| format!("Failed to parse manifest: {}", path))
+    toml::from_str(&content).with_context(|| format!("Failed to parse manifest: {}", path))
 }
 
 /// Validates a manifest for correctness and completeness.
@@ -321,7 +320,10 @@ c-flags = ["-O2"]
 
 /// Prints a human-readable summary of a manifest to stdout.
 pub fn print_info(manifest: &Manifest) {
-    println!("=== {} v{} ===", manifest.project.name, manifest.project.version);
+    println!(
+        "=== {} v{} ===",
+        manifest.project.name, manifest.project.version
+    );
     println!("Description: {}", manifest.project.description);
     println!("Output dir:  {}", manifest.project.output_dir);
     println!();
@@ -334,8 +336,14 @@ pub fn print_info(manifest: &Manifest) {
 
     println!("Ownership Rules ({}):", manifest.ownership_rules.len());
     for rule in &manifest.ownership_rules {
-        println!("  - {} [{}]{}", rule.function, rule.pattern,
-            rule.resource_type.as_deref().map(|t| format!(" -> {}", t)).unwrap_or_default()
+        println!(
+            "  - {} [{}]{}",
+            rule.function,
+            rule.pattern,
+            rule.resource_type
+                .as_deref()
+                .map(|t| format!(" -> {}", t))
+                .unwrap_or_default()
         );
     }
     println!();

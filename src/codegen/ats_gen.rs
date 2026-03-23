@@ -15,9 +15,7 @@
 
 use anyhow::Result;
 
-use crate::abi::{
-    ATSFunction, ATSModule, ATSParam, MemorySafetyProof, OwnershipPattern, Viewtype,
-};
+use crate::abi::{ATSFunction, ATSModule, ATSParam, MemorySafetyProof, OwnershipPattern, Viewtype};
 use crate::codegen::parser::CFunctionSignature;
 use crate::manifest::{CSource, OwnershipRule};
 
@@ -222,7 +220,7 @@ fn generate_wrapper_function(
     let resource_vt = rule
         .resource_type
         .as_deref()
-        .map(|t| viewtype_name(t))
+        .map(viewtype_name)
         .unwrap_or_else(|| "ptr".to_string());
 
     let (params, return_type) = match pattern {

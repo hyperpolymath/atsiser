@@ -1,4 +1,18 @@
 #![forbid(unsafe_code)]
+#![allow(
+    dead_code,
+    clippy::too_many_arguments,
+    clippy::manual_strip,
+    clippy::if_same_then_else,
+    clippy::vec_init_then_push,
+    clippy::upper_case_acronyms,
+    clippy::format_in_format_args,
+    clippy::enum_variant_names,
+    clippy::module_inception,
+    clippy::doc_lazy_continuation,
+    clippy::manual_clamp,
+    clippy::type_complexity
+)]
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 //
@@ -17,11 +31,13 @@ pub mod abi;
 pub mod codegen;
 pub mod manifest;
 
-pub use abi::{ATSFunction, ATSModule, ATSParam, LinearPtr, MemorySafetyProof, OwnershipPattern, Viewtype};
+pub use abi::{
+    ATSFunction, ATSModule, ATSParam, LinearPtr, MemorySafetyProof, OwnershipPattern, Viewtype,
+};
 pub use codegen::ats_gen;
 pub use codegen::compiler;
 pub use codegen::parser;
-pub use manifest::{load_manifest, validate, Manifest};
+pub use manifest::{Manifest, load_manifest, validate};
 
 /// Convenience: load, validate, and generate all ATS2 artifacts in one call.
 ///

@@ -164,7 +164,10 @@ fn test_ownership_pattern_detection() {
         likely_alloc: false,
         likely_free: false,
     };
-    assert_eq!(parser::detect_ownership_pattern(&borrow_sig), Some("borrow"));
+    assert_eq!(
+        parser::detect_ownership_pattern(&borrow_sig),
+        Some("borrow")
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -255,15 +258,30 @@ fn test_ats2_code_rendering() {
     let (sats, dats) = ats_gen::render_module(&module).unwrap();
 
     // SATS should contain viewtype definition
-    assert!(sats.contains("viewtypedef resource_t_vt"), "sats missing viewtype def");
+    assert!(
+        sats.contains("viewtypedef resource_t_vt"),
+        "sats missing viewtype def"
+    );
 
     // SATS should contain extern declarations
-    assert!(sats.contains("extern fun res_alloc_c"), "sats missing extern fun");
-    assert!(sats.contains("extern fun res_free_c"), "sats missing extern fun");
+    assert!(
+        sats.contains("extern fun res_alloc_c"),
+        "sats missing extern fun"
+    );
+    assert!(
+        sats.contains("extern fun res_free_c"),
+        "sats missing extern fun"
+    );
 
     // SATS should contain safe wrapper signatures
-    assert!(sats.contains("fun safe_res_alloc"), "sats missing safe wrapper sig");
-    assert!(sats.contains("fun safe_res_free"), "sats missing safe wrapper sig");
+    assert!(
+        sats.contains("fun safe_res_alloc"),
+        "sats missing safe wrapper sig"
+    );
+    assert!(
+        sats.contains("fun safe_res_free"),
+        "sats missing safe wrapper sig"
+    );
 
     // DATS should contain implementation bodies
     assert!(dats.contains("implement"), "dats missing implement keyword");
@@ -313,7 +331,10 @@ fn test_manifest_init_no_overwrite() {
 
     // Second init should fail
     let result = manifest::init_manifest(path);
-    assert!(result.is_err(), "init should refuse to overwrite existing manifest");
+    assert!(
+        result.is_err(),
+        "init should refuse to overwrite existing manifest"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -387,7 +408,12 @@ fn test_compiler_command_construction() {
     assert!(display.contains("-O2"), "Release build should include -O2");
 
     // Environment
-    assert!(build_cmd.env.iter().any(|(k, v)| k == "PATSHOME" && v == "/opt/ats2"));
+    assert!(
+        build_cmd
+            .env
+            .iter()
+            .any(|(k, v)| k == "PATSHOME" && v == "/opt/ats2")
+    );
 
     // Typecheck command
     let tc_cmd = compiler::typecheck_command(&manifest, "out/test.dats").unwrap();
@@ -465,14 +491,32 @@ fn test_end_to_end_generation() {
 
     // Check contents
     let sats_content = std::fs::read_to_string(&sats_path).unwrap();
-    assert!(sats_content.contains("mylib_t_vt"), "sats should define mylib_t viewtype");
-    assert!(sats_content.contains("safe_mylib_create"), "sats should have alloc wrapper");
-    assert!(sats_content.contains("safe_mylib_destroy"), "sats should have free wrapper");
-    assert!(sats_content.contains("safe_mylib_process"), "sats should have borrow wrapper");
+    assert!(
+        sats_content.contains("mylib_t_vt"),
+        "sats should define mylib_t viewtype"
+    );
+    assert!(
+        sats_content.contains("safe_mylib_create"),
+        "sats should have alloc wrapper"
+    );
+    assert!(
+        sats_content.contains("safe_mylib_destroy"),
+        "sats should have free wrapper"
+    );
+    assert!(
+        sats_content.contains("safe_mylib_process"),
+        "sats should have borrow wrapper"
+    );
 
     let dats_content = std::fs::read_to_string(&dats_path).unwrap();
-    assert!(dats_content.contains("implement"), "dats should have implementations");
-    assert!(dats_content.contains("$extfcall"), "dats should call C functions via extfcall");
+    assert!(
+        dats_content.contains("implement"),
+        "dats should have implementations"
+    );
+    assert!(
+        dats_content.contains("$extfcall"),
+        "dats should call C functions via extfcall"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -487,7 +531,10 @@ fn test_viewtype_ats2_definitions() {
     assert!(def.starts_with("viewtypedef file_vt"));
     assert!(def.contains("FILE @ l"));
     assert!(def.contains("ptr l"));
-    assert!(!def.contains("option_v"), "non-nullable should not use option_v");
+    assert!(
+        !def.contains("option_v"),
+        "non-nullable should not use option_v"
+    );
 
     // Nullable viewtype
     let nvt = Viewtype::nullable("maybe_file_vt", "FILE");
@@ -497,7 +544,10 @@ fn test_viewtype_ats2_definitions() {
     // Sized viewtype (dependent type)
     let svt = Viewtype::sized("array_vt", "int", "n");
     let sdef = svt.to_ats2_definition();
-    assert!(sdef.contains("array_vt(n)"), "sized should include size parameter");
+    assert!(
+        sdef.contains("array_vt(n)"),
+        "sized should include size parameter"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -511,38 +561,56 @@ fn test_memory_safety_proofs() {
     };
     let alloc_ats = alloc_proof.to_ats2_proof();
     assert!(alloc_ats.contains("prval"), "alloc proof should use prval");
-    assert!(alloc_ats.contains("alloc_buf_vt"), "alloc proof should reference viewtype");
+    assert!(
+        alloc_ats.contains("alloc_buf_vt"),
+        "alloc proof should reference viewtype"
+    );
 
     let free_proof = MemorySafetyProof::FreeProof {
         ptr_id: "handle".to_string(),
     };
     let free_ats = free_proof.to_ats2_proof();
-    assert!(free_ats.contains("free_handle"), "free proof should reference ptr_id");
+    assert!(
+        free_ats.contains("free_handle"),
+        "free proof should reference ptr_id"
+    );
 
     let borrow_proof = MemorySafetyProof::BorrowProof {
         ptr_id: "data".to_string(),
         mutable: false,
     };
     let borrow_ats = borrow_proof.to_ats2_proof();
-    assert!(borrow_ats.contains("borrow_v"), "immutable borrow should use borrow_v");
+    assert!(
+        borrow_ats.contains("borrow_v"),
+        "immutable borrow should use borrow_v"
+    );
 
     let mut_borrow = MemorySafetyProof::BorrowProof {
         ptr_id: "data".to_string(),
         mutable: true,
     };
     let mut_ats = mut_borrow.to_ats2_proof();
-    assert!(mut_ats.contains("borrow_vw"), "mutable borrow should use borrow_vw");
+    assert!(
+        mut_ats.contains("borrow_vw"),
+        "mutable borrow should use borrow_vw"
+    );
 
     let bounds_proof = MemorySafetyProof::BoundsProof {
         buffer_id: "arr".to_string(),
         index_expr: "i".to_string(),
     };
     let bounds_ats = bounds_proof.to_ats2_proof();
-    assert!(bounds_ats.contains("lemma_bounds"), "bounds proof should use lemma_bounds");
+    assert!(
+        bounds_ats.contains("lemma_bounds"),
+        "bounds proof should use lemma_bounds"
+    );
 
     let null_proof = MemorySafetyProof::NullCheckProof {
         ptr_id: "ptr".to_string(),
     };
     let null_ats = null_proof.to_ats2_proof();
-    assert!(null_ats.contains("opt_unsome"), "null check should use opt_unsome");
+    assert!(
+        null_ats.contains("opt_unsome"),
+        "null check should use opt_unsome"
+    );
 }
