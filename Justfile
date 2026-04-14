@@ -2,6 +2,8 @@
 # atsiser — ATS2 linear type wrappers for C memory safety
 
 # Default: build and test
+import? "contractile.just"
+
 default: build test
 
 # Build release binary
