@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn test_parse_simple_function() {
         let source = "void* malloc(size_t size);\n";
-        let sigs = parse_c_source(source).unwrap();
+        let sigs = parse_c_source(source).expect("TODO: handle error");
         assert_eq!(sigs.len(), 1);
         assert_eq!(sigs[0].name, "malloc");
         assert!(sigs[0].return_type.contains("void*"));
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn test_parse_free_function() {
         let source = "void free(void* ptr);\n";
-        let sigs = parse_c_source(source).unwrap();
+        let sigs = parse_c_source(source).expect("TODO: handle error");
         assert_eq!(sigs.len(), 1);
         assert_eq!(sigs[0].name, "free");
         assert!(sigs[0].likely_free);
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn test_parse_borrow_function() {
         let source = "size_t strlen(const char* s);\n";
-        let sigs = parse_c_source(source).unwrap();
+        let sigs = parse_c_source(source).expect("TODO: handle error");
         assert_eq!(sigs.len(), 1);
         assert_eq!(sigs[0].name, "strlen");
         assert!(!sigs[0].likely_alloc);
@@ -299,7 +299,7 @@ int printf(const char* fmt);
 FILE* fopen(const char* path, const char* mode);
 int fclose(FILE* fp);
 "#;
-        let sigs = parse_c_source(source).unwrap();
+        let sigs = parse_c_source(source).expect("TODO: handle error");
         assert_eq!(sigs.len(), 5);
     }
 
@@ -368,7 +368,7 @@ void free(void* ptr);
     #[test]
     fn test_void_params() {
         let source = "int getpid(void);\n";
-        let sigs = parse_c_source(source).unwrap();
+        let sigs = parse_c_source(source).expect("TODO: handle error");
         assert_eq!(sigs.len(), 1);
         assert!(sigs[0].params.is_empty());
     }

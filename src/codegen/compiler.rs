@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_build_command_structure() {
         let manifest = test_manifest();
-        let cmd = build_command(&manifest, "generated/ats/test_safe.dats", false).unwrap();
+        let cmd = build_command(&manifest, "generated/ats/test_safe.dats", false).expect("TODO: handle error");
 
         assert_eq!(cmd.program, "patscc");
         assert!(cmd.args.contains(&"-DATS_MEMALLOC_LIBC".to_string()));
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_build_command_release() {
         let manifest = test_manifest();
-        let cmd = build_command(&manifest, "test.dats", true).unwrap();
+        let cmd = build_command(&manifest, "test.dats", true).expect("TODO: handle error");
 
         // Release mode should add -O2 via -ccopt
         let ccopt_indices: Vec<usize> = cmd
@@ -304,7 +304,7 @@ mod tests {
     #[test]
     fn test_typecheck_command() {
         let manifest = test_manifest();
-        let cmd = typecheck_command(&manifest, "test.dats").unwrap();
+        let cmd = typecheck_command(&manifest, "test.dats").expect("TODO: handle error");
 
         assert_eq!(cmd.program, "patsopt");
         assert!(cmd.args.contains(&"--typecheck".to_string()));
@@ -328,7 +328,7 @@ mod tests {
     fn test_build_command_without_patshome() {
         let mut manifest = test_manifest();
         manifest.ats2.patshome = None;
-        let cmd = build_command(&manifest, "test.dats", false).unwrap();
+        let cmd = build_command(&manifest, "test.dats", false).expect("TODO: handle error");
         assert!(cmd.env.is_empty());
     }
 }

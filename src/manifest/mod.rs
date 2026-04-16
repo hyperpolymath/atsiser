@@ -387,7 +387,7 @@ pattern = "alloc"
 [ats2]
 patsopt = "patsopt"
 "#;
-        let manifest: Manifest = toml::from_str(toml_str).unwrap();
+        let manifest: Manifest = toml::from_str(toml_str).expect("TODO: handle error");
         assert_eq!(manifest.project.name, "test");
         assert_eq!(manifest.c_sources.len(), 1);
         assert_eq!(manifest.ownership_rules.len(), 1);

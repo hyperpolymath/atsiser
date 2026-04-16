@@ -389,11 +389,11 @@ mod tests {
 
     #[test]
     fn test_parse_pattern() {
-        assert_eq!(parse_pattern("alloc").unwrap(), OwnershipPattern::Alloc);
-        assert_eq!(parse_pattern("free").unwrap(), OwnershipPattern::Free);
-        assert_eq!(parse_pattern("borrow").unwrap(), OwnershipPattern::Borrow);
+        assert_eq!(parse_pattern("alloc").expect("TODO: handle error"), OwnershipPattern::Alloc);
+        assert_eq!(parse_pattern("free").expect("TODO: handle error"), OwnershipPattern::Free);
+        assert_eq!(parse_pattern("borrow").expect("TODO: handle error"), OwnershipPattern::Borrow);
         assert_eq!(
-            parse_pattern("transfer").unwrap(),
+            parse_pattern("transfer").expect("TODO: handle error"),
             OwnershipPattern::Transfer
         );
         assert!(parse_pattern("invalid").is_err());
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_generate_module_empty() {
-        let module = generate_module("test", &[], &[], &[]).unwrap();
+        let module = generate_module("test", &[], &[], &[]).expect("TODO: handle error");
         assert_eq!(module.name, "test");
         assert!(module.viewtypes.is_empty());
         assert!(module.functions.is_empty());
@@ -426,7 +426,7 @@ mod tests {
             },
         ];
 
-        let module = generate_module("test", &[], &rules, &[]).unwrap();
+        let module = generate_module("test", &[], &rules, &[]).expect("TODO: handle error");
         assert_eq!(module.functions.len(), 2);
         assert_eq!(module.functions[0].name, "safe_my_alloc");
         assert_eq!(module.functions[1].name, "safe_my_free");
@@ -438,7 +438,7 @@ mod tests {
     #[test]
     fn test_render_module_produces_sats_and_dats() {
         let module = ATSModule::new("test");
-        let (sats, dats) = render_module(&module).unwrap();
+        let (sats, dats) = render_module(&module).expect("TODO: handle error");
         assert!(sats.contains("PMPL-1.0-or-later"));
         assert!(dats.contains("PMPL-1.0-or-later"));
         assert!(sats.contains("static signatures"));
