@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 //
 // Integration tests for atsiser.
@@ -286,7 +286,7 @@ fn test_ats2_code_rendering() {
     // DATS should contain implementation bodies
     assert!(dats.contains("implement"), "dats missing implement keyword");
     assert!(dats.contains("$extfcall"), "dats missing $extfcall");
-    assert!(dats.contains("PMPL-1.0-or-later"), "dats missing license");
+    assert!(dats.contains("MPL-2.0"), "dats missing license");
 
     // DATS should contain staload
     assert!(dats.contains("staload"), "dats missing staload");
