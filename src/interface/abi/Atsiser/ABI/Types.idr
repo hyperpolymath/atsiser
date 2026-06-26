@@ -17,6 +17,7 @@ module Atsiser.ABI.Types
 import Data.Bits
 import Data.So
 import Data.Vect
+import Decidable.Equality
 
 %default total
 
@@ -29,13 +30,10 @@ public export
 data Platform = Linux | Windows | MacOS | BSD | WASM
 
 ||| Compile-time platform detection
-||| This will be set during compilation based on target
+||| This is the default target; override with compiler flags as needed.
 public export
 thisPlatform : Platform
-thisPlatform =
-  %runElab do
-    -- Platform detection logic
-    pure Linux  -- Default, override with compiler flags
+thisPlatform = Linux
 
 --------------------------------------------------------------------------------
 -- Result Codes
@@ -81,7 +79,48 @@ DecEq Result where
   decEq NullPointer NullPointer = Yes Refl
   decEq OwnershipViolation OwnershipViolation = Yes Refl
   decEq BoundsViolation BoundsViolation = Yes Refl
-  decEq _ _ = No absurd
+  decEq Ok Error = No (\case Refl impossible)
+  decEq Ok InvalidParam = No (\case Refl impossible)
+  decEq Ok OutOfMemory = No (\case Refl impossible)
+  decEq Ok NullPointer = No (\case Refl impossible)
+  decEq Ok OwnershipViolation = No (\case Refl impossible)
+  decEq Ok BoundsViolation = No (\case Refl impossible)
+  decEq Error Ok = No (\case Refl impossible)
+  decEq Error InvalidParam = No (\case Refl impossible)
+  decEq Error OutOfMemory = No (\case Refl impossible)
+  decEq Error NullPointer = No (\case Refl impossible)
+  decEq Error OwnershipViolation = No (\case Refl impossible)
+  decEq Error BoundsViolation = No (\case Refl impossible)
+  decEq InvalidParam Ok = No (\case Refl impossible)
+  decEq InvalidParam Error = No (\case Refl impossible)
+  decEq InvalidParam OutOfMemory = No (\case Refl impossible)
+  decEq InvalidParam NullPointer = No (\case Refl impossible)
+  decEq InvalidParam OwnershipViolation = No (\case Refl impossible)
+  decEq InvalidParam BoundsViolation = No (\case Refl impossible)
+  decEq OutOfMemory Ok = No (\case Refl impossible)
+  decEq OutOfMemory Error = No (\case Refl impossible)
+  decEq OutOfMemory InvalidParam = No (\case Refl impossible)
+  decEq OutOfMemory NullPointer = No (\case Refl impossible)
+  decEq OutOfMemory OwnershipViolation = No (\case Refl impossible)
+  decEq OutOfMemory BoundsViolation = No (\case Refl impossible)
+  decEq NullPointer Ok = No (\case Refl impossible)
+  decEq NullPointer Error = No (\case Refl impossible)
+  decEq NullPointer InvalidParam = No (\case Refl impossible)
+  decEq NullPointer OutOfMemory = No (\case Refl impossible)
+  decEq NullPointer OwnershipViolation = No (\case Refl impossible)
+  decEq NullPointer BoundsViolation = No (\case Refl impossible)
+  decEq OwnershipViolation Ok = No (\case Refl impossible)
+  decEq OwnershipViolation Error = No (\case Refl impossible)
+  decEq OwnershipViolation InvalidParam = No (\case Refl impossible)
+  decEq OwnershipViolation OutOfMemory = No (\case Refl impossible)
+  decEq OwnershipViolation NullPointer = No (\case Refl impossible)
+  decEq OwnershipViolation BoundsViolation = No (\case Refl impossible)
+  decEq BoundsViolation Ok = No (\case Refl impossible)
+  decEq BoundsViolation Error = No (\case Refl impossible)
+  decEq BoundsViolation InvalidParam = No (\case Refl impossible)
+  decEq BoundsViolation OutOfMemory = No (\case Refl impossible)
+  decEq BoundsViolation NullPointer = No (\case Refl impossible)
+  decEq BoundsViolation OwnershipViolation = No (\case Refl impossible)
 
 --------------------------------------------------------------------------------
 -- Ownership State Machine
@@ -165,8 +204,9 @@ data Handle : Type where
 ||| Returns Nothing if pointer is null
 public export
 createHandle : Bits64 -> Maybe Handle
-createHandle 0 = Nothing
-createHandle ptr = Just (MkHandle ptr)
+createHandle ptr = case choose (ptr /= 0) of
+  Left ok => Just (MkHandle ptr {nonNull = ok})
+  Right _ => Nothing
 
 ||| Extract pointer value from handle
 public export
@@ -281,9 +321,10 @@ data HasAlignment : Type -> Nat -> Type where
 
 ||| Size of C types (platform-specific)
 public export
+||| Note: `CInt p` / `CSize p` are type synonyms that reduce to `Bits32`/`Bits64`,
+||| so they are covered by the `Bits32`/`Bits64` cases below rather than matched
+||| as constructors (Idris2 cannot pattern-match on a type-level function).
 cSizeOf : (p : Platform) -> (t : Type) -> Nat
-cSizeOf p (CInt _) = 4
-cSizeOf p (CSize _) = if ptrSize p == 64 then 8 else 4
 cSizeOf p Bits32 = 4
 cSizeOf p Bits64 = 8
 cSizeOf p Double = 8
@@ -291,9 +332,9 @@ cSizeOf p _ = ptrSize p `div` 8
 
 ||| Alignment of C types (platform-specific)
 public export
+||| As with `cSizeOf`, `CInt`/`CSize` reduce to `Bits32`/`Bits64` and are
+||| handled by those cases rather than matched as constructors.
 cAlignOf : (p : Platform) -> (t : Type) -> Nat
-cAlignOf p (CInt _) = 4
-cAlignOf p (CSize _) = if ptrSize p == 64 then 8 else 4
 cAlignOf p Bits32 = 4
 cAlignOf p Bits64 = 8
 cAlignOf p Double = 8
