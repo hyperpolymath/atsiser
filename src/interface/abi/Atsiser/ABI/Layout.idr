@@ -16,6 +16,8 @@ module Atsiser.ABI.Layout
 import Atsiser.ABI.Types
 import Data.Vect
 import Data.So
+import Data.Nat
+import Decidable.Equality
 
 %default total
 
@@ -29,12 +31,25 @@ paddingFor : (offset : Nat) -> (alignment : Nat) -> Nat
 paddingFor offset alignment =
   if offset `mod` alignment == 0
     then 0
-    else alignment - (offset `mod` alignment)
+    else minus alignment (offset `mod` alignment)
 
 ||| Proof that alignment divides aligned size
 public export
 data Divides : Nat -> Nat -> Type where
   DivideBy : (k : Nat) -> {n : Nat} -> {m : Nat} -> (m = k * n) -> Divides n m
+
+||| Sound decision procedure: does `n` divide `m`?
+||| For n = S k, compute the quotient and check m = q * (S k) by decidable
+||| equality. Division does not reduce during typechecking, so the equation
+||| is genuinely checked at runtime rather than asserted.
+public export
+decDivides : (n : Nat) -> (m : Nat) -> Maybe (Divides n m)
+decDivides Z _ = Nothing
+decDivides (S k) m =
+  let q = div m (S k) in
+  case decEq m (q * (S k)) of
+    Yes prf => Just (DivideBy q prf)
+    No _ => Nothing
 
 ||| Round up to next alignment boundary
 public export
@@ -42,11 +57,13 @@ alignUp : (size : Nat) -> (alignment : Nat) -> Nat
 alignUp size alignment =
   size + paddingFor size alignment
 
-||| Proof that alignUp produces aligned result
+||| Decide that `alignUp size align` is divisible by `align`.
+||| Returns a genuine `Divides` witness when the quotient checks out, and
+||| `Nothing` otherwise (e.g. align = 0). A `Refl`-only proof is impossible
+||| here because division does not reduce during typechecking.
 public export
-alignUpCorrect : (size : Nat) -> (align : Nat) -> (align > 0) -> Divides align (alignUp size align)
-alignUpCorrect size align prf =
-  DivideBy ((size + paddingFor size align) `div` align) Refl
+alignUpCorrect : (size : Nat) -> (align : Nat) -> Maybe (Divides align (alignUp size align))
+alignUpCorrect size align = decDivides align (alignUp size align)
 
 --------------------------------------------------------------------------------
 -- Ownership-Annotated Fields
@@ -109,7 +126,7 @@ ownedFieldCount layout = length (filter requiresOwnershipTracking (toList layout
 
 ||| Calculate total struct size with padding
 public export
-calcStructSize : Vect n Field -> Nat -> Nat
+calcStructSize : Vect len Field -> Nat -> Nat
 calcStructSize [] align = 0
 calcStructSize (f :: fs) align =
   let lastOffset = foldl (\acc, field => nextFieldOffset field) f.offset fs
@@ -118,23 +135,30 @@ calcStructSize (f :: fs) align =
 
 ||| Proof that field offsets are correctly aligned
 public export
-data FieldsAligned : Vect n Field -> Type where
+data FieldsAligned : Vect len Field -> Type where
   NoFields : FieldsAligned []
   ConsField :
     (f : Field) ->
-    (rest : Vect n Field) ->
+    (rest : Vect len Field) ->
     Divides f.alignment f.offset ->
     FieldsAligned rest ->
     FieldsAligned (f :: rest)
 
-||| Verify a struct layout is valid
+||| Verify a struct layout is valid.
+||| Both erased obligations of `MkStructLayout` are discharged with genuine
+||| witnesses: the size bound via `choose`, and `Divides align size` via
+||| `decDivides`. If either fails to hold for the computed size, we report an
+||| error instead of fabricating a proof.
 public export
-verifyLayout : (name : String) -> (fields : Vect n Field) -> (align : Nat) -> Either String StructLayout
+verifyLayout : (name : String) -> (fields : Vect len Field) -> (align : Nat) -> Either String StructLayout
 verifyLayout name fields align =
-  let size = calcStructSize fields align
-   in case decSo (size >= sum (map (\f => f.size) fields)) of
-        Yes prf => Right (MkStructLayout name fields size align)
-        No _ => Left "Invalid struct size for \{name}"
+  let size = calcStructSize fields align in
+  case choose (size >= sum (map (\f => f.size) fields)) of
+    Right _ => Left "Invalid struct size for \{name}"
+    Left szOk => case decDivides align size of
+      Nothing => Left "Total size of \{name} is not aligned to \{show align}"
+      Just dvd => Right (MkStructLayout name fields size align
+                          {sizeCorrect = szOk} {aligned = dvd})
 
 --------------------------------------------------------------------------------
 -- Platform-Specific Layouts
@@ -165,11 +189,25 @@ data CABICompliant : StructLayout -> Type where
     FieldsAligned layout.fields ->
     CABICompliant layout
 
+||| Decide whether every field's offset is aligned to its alignment,
+||| building a FieldsAligned witness over the whole vector.
+public export
+decFieldsAligned : (fields : Vect len Field) -> Maybe (FieldsAligned fields)
+decFieldsAligned [] = Just NoFields
+decFieldsAligned (f :: rest) =
+  case decDivides f.alignment f.offset of
+    Nothing => Nothing
+    Just dvd => case decFieldsAligned rest of
+      Nothing => Nothing
+      Just restPrf => Just (ConsField f rest dvd restPrf)
+
 ||| Check if layout follows C ABI
 public export
 checkCABI : (layout : StructLayout) -> Either String (CABICompliant layout)
 checkCABI layout =
-  Right (CABIOk layout ?fieldsAlignedProof)
+  case decFieldsAligned layout.fields of
+    Just prf => Right (CABIOk layout prf)
+    Nothing => Left "Struct \{layout.structName} has misaligned fields"
 
 --------------------------------------------------------------------------------
 -- Ownership Graph for Structs
@@ -216,6 +254,8 @@ exampleOwnedLayout =
     ]
     16  -- Total size: 16 bytes
     8   -- Alignment: 8 bytes
+    {sizeCorrect = Oh}
+    {aligned = DivideBy 2 Refl}  -- 16 = 2 * 8
 
 ||| Example: Layout for a struct with a borrowed pointer.
 ||| This is what atsiser generates when it finds:
@@ -231,6 +271,8 @@ exampleBorrowedLayout =
     ]
     16  -- Total size: 16 bytes (with padding)
     8   -- Alignment: 8 bytes
+    {sizeCorrect = Oh}
+    {aligned = DivideBy 2 Refl}  -- 16 = 2 * 8
 
 --------------------------------------------------------------------------------
 -- Offset Calculation
@@ -244,7 +286,11 @@ fieldOffset layout name =
     Just idx => Just (finToNat idx ** index idx layout.fields)
     Nothing => Nothing
 
-||| Proof that field offset is within struct bounds
+||| Decide whether a field's offset+size fits within the struct's total size.
+||| Returns a proof when the bound holds, Nothing otherwise (it does not hold
+||| in general, so a universally-quantified return type would be unsound).
 public export
-offsetInBounds : (layout : StructLayout) -> (f : Field) -> So (f.offset + f.size <= layout.totalSize)
-offsetInBounds layout f = ?offsetInBoundsProof
+offsetInBounds : (layout : StructLayout) -> (f : Field) -> Maybe (So (f.offset + f.size <= layout.totalSize))
+offsetInBounds layout f = case choose (f.offset + f.size <= layout.totalSize) of
+  Left ok => Just ok
+  Right _ => Nothing

@@ -15,6 +15,9 @@ Thumbs.db
 /target/
 /_build/
 /build/
+**/build/
+*.ttc
+*.ttm
 /dist/
 /out/
 
