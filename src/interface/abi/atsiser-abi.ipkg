@@ -10,3 +10,4 @@ modules = Atsiser.ABI.Types
         , Atsiser.ABI.Semantics
         , Atsiser.ABI.Invariants
         , Atsiser.ABI.FfiSeam
+        , Atsiser.ABI.Capstone
