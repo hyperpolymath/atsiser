@@ -389,9 +389,18 @@ mod tests {
 
     #[test]
     fn test_parse_pattern() {
-        assert_eq!(parse_pattern("alloc").expect("TODO: handle error"), OwnershipPattern::Alloc);
-        assert_eq!(parse_pattern("free").expect("TODO: handle error"), OwnershipPattern::Free);
-        assert_eq!(parse_pattern("borrow").expect("TODO: handle error"), OwnershipPattern::Borrow);
+        assert_eq!(
+            parse_pattern("alloc").expect("TODO: handle error"),
+            OwnershipPattern::Alloc
+        );
+        assert_eq!(
+            parse_pattern("free").expect("TODO: handle error"),
+            OwnershipPattern::Free
+        );
+        assert_eq!(
+            parse_pattern("borrow").expect("TODO: handle error"),
+            OwnershipPattern::Borrow
+        );
         assert_eq!(
             parse_pattern("transfer").expect("TODO: handle error"),
             OwnershipPattern::Transfer

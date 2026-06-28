@@ -271,7 +271,8 @@ mod tests {
     #[test]
     fn test_build_command_structure() {
         let manifest = test_manifest();
-        let cmd = build_command(&manifest, "generated/ats/test_safe.dats", false).expect("TODO: handle error");
+        let cmd = build_command(&manifest, "generated/ats/test_safe.dats", false)
+            .expect("TODO: handle error");
 
         assert_eq!(cmd.program, "patscc");
         assert!(cmd.args.contains(&"-DATS_MEMALLOC_LIBC".to_string()));
