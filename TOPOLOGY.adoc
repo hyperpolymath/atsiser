@@ -1,17 +1,15 @@
-<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-<!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
-# TOPOLOGY — atsiser
+== TOPOLOGY — atsiser
 
-## Purpose
+=== Purpose
 
-ATSiser wraps C codebases in ATS2 linear types for zero-cost memory safety.
-It analyses C source, identifies memory-critical patterns, generates ATS2
-wrappers with `viewtype`/`dataviewtype` annotations, and compiles them back
-to C with proofs erased — zero runtime overhead.
+ATSiser wraps C codebases in ATS2 linear types for zero-cost memory
+safety. It analyses C source, identifies memory-critical patterns,
+generates ATS2 wrappers with `+viewtype+`/`+dataviewtype+` annotations,
+and compiles them back to C with proofs erased — zero runtime overhead.
 
-## Module Map
+=== Module Map
 
-```
+....
 atsiser/
 ├── src/
 │   ├── main.rs                  # CLI entry point (clap subcommands)
@@ -66,11 +64,11 @@ atsiser/
     ├── configs/                 # git-cliff, etc.
     ├── scripts/                 # forge, lifecycle, maintenance, verification
     └── compliance/              # REUSE dep5, cargo-deny
-```
+....
 
-## Data Flow
+=== Data Flow
 
-```
+....
 atsiser.toml          C headers + sources
      │                       │
      ▼                       ▼
@@ -97,26 +95,30 @@ atsiser.toml          C headers + sources
                     Generated C
                   (proofs erased,
                    zero overhead)
-```
+....
 
-## Key Types (Idris2 ABI)
+=== Key Types (Idris2 ABI)
 
-| Type | Purpose |
-|------|---------|
-| `LinearPtr` | Tracked C pointer with ownership proof |
-| `Viewtype` | ATS2 viewtype classification (owned, borrowed, consumed) |
-| `OwnershipState` | State machine for pointer lifecycle |
-| `AllocationSite` | Source location of malloc/calloc/realloc |
-| `BufferBounds` | Proven array access bounds (offset, length) |
-| `ProofObligation` | ATS2 proof term to be emitted |
+[width="100%",cols="40%,60%",options="header",]
+|===
+|Type |Purpose
+|`+LinearPtr+` |Tracked C pointer with ownership proof
+|`+Viewtype+` |ATS2 viewtype classification (owned, borrowed, consumed)
+|`+OwnershipState+` |State machine for pointer lifecycle
+|`+AllocationSite+` |Source location of malloc/calloc/realloc
+|`+BufferBounds+` |Proven array access bounds (offset, length)
+|`+ProofObligation+` |ATS2 proof term to be emitted
+|===
 
-## Integration Points
+=== Integration Points
 
-| System | Role |
-|--------|------|
-| **iseriser** | Meta-framework that generates -iser scaffolding |
-| **proven** | Shared Idris2 verified library for formal proofs |
-| **typell** | Type theory engine |
-| **BoJ-server** | Cartridge for on-demand C wrapping |
-| **PanLL** | Visualise ownership graphs and proof coverage |
-| **VeriSimDB** | Store analysis results and proof artifacts |
+[cols=",",options="header",]
+|===
+|System |Role
+|*iseriser* |Meta-framework that generates -iser scaffolding
+|*proven* |Shared Idris2 verified library for formal proofs
+|*typell* |Type theory engine
+|*BoJ-server* |Cartridge for on-demand C wrapping
+|*PanLL* |Visualise ownership graphs and proof coverage
+|*VeriSimDB* |Store analysis results and proof artifacts
+|===
