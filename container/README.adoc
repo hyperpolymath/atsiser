@@ -154,8 +154,8 @@ For k9-svc managed deployments:
 
 [source,bash]
 ----
-# Validate the deployment component
-nickel typecheck container/deploy.k9.ncl
+# Render the deployment placeholders, then validate the K9 component.
+k9-svc validate container/deploy.k9.ncl
 
 # Deploy (requires Hunt-level authorisation)
 k9-svc deploy container/deploy.k9.ncl --env production
